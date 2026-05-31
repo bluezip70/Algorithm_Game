@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>우당탕탕! 스택버거 알고리즘 게임</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts (DoHyeon, Gaegu) -->
+  <link href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=Gaegu:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Gaegu', cursive;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .title-font {
+      font-family: 'Do Hyeon', sans-serif;
+    }
+    /* 귀여운 바운스 애니메이션 */
+    @keyframes bounce-slow {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+    .bounce-element {
+      animation: bounce-slow 2s infinite ease-in-out;
+    }
+    /* 드래그 가능 아이템 스타일 */
+    .ingredient-btn {
+      transition: transform 0.1s ease, box-shadow 0.1s ease;
+    }
+    .ingredient-btn:active {
+      transform: scale(0.9);
+    }
+    /* 스노우/파티클 효과용 */
+    .particle {
+      position: absolute;
+      pointer-events: none;
+      animation: floatUp 1.5s ease-out forwards;
+    }
+    @keyframes floatUp {
+      0% { transform: translateY(0) scale(1); opacity: 1; }
+      100% { transform: translateY(-100px) scale(0.5); opacity: 0; }
+    }
+  </style>
+</head>
+<body class="bg-amber-50 min-h-screen flex flex-col items-center justify-between overflow-x-hidden p-4">
+
+  <!-- 상단 헤더 영역 -->
+  <header class="w-full max-w-4xl bg-white rounded-3xl shadow-md p-4 flex flex-wrap justify-between items-center gap-3 border-4 border-amber-300">
+    <div class="flex items-center gap-2">
+      <span class="text-3xl bounce-element">🍔</span>
+      <h1 class="title-font text-2xl md:text-3xl text-amber-600 tracking-wide">순차 코딩! 스택버거</h1>
+    </div>
+    <div class="flex items-center gap-4 text-xl font-bold">
+      <!-- 타이머 -->
+      <div class="bg-red-100 text-red-600 px-4 py-1.5 rounded-full flex items-center gap-1 border-2 border-red-300 shadow-sm">
+        <span>⏱️ 남은 시간:</span>
+        <span id="timer-display" class="font-mono text-2xl">05:00</span>
+      </div>
+      <!-- 현재 점수 -->
+      <div class="bg-yellow-100 text-yellow-700 px-4 py-1.5 rounded-full flex items-center gap-1 border-2 border-yellow-300 shadow-sm">
+        <span>⭐ 점수:</span>
+        <span id="score-display" class="text-2xl">0</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- 메인 게임 보드 -->
+  <main class="w-full max-w-4xl grid grid-cols-1 md:grid-cols-12 gap-4 my-4 flex-grow relative">
+    
+    <!-- 왼쪽: 내가 만들고 있는 햄버거 접시 (수용 영역) -->
+    <div class="md:col-span-7 bg-white rounded-3xl border-4 border-dashed border-amber-400 p-6 flex flex-col justify-between items-center relative min-h-[350px] shadow-lg">
+      <div class="absolute top-3 left-4 bg-amber-500 text-white font-bold px-3 py-1 rounded-full text-lg shadow-sm">
+        플레이트 🍽️ (순서대로 쌓으세요!)
+      </div>
+      
+      <!-- 비었을 때 안내 메시지 -->
+      <div id="plate-placeholder" class="absolute inset-0 flex flex-col justify-center items-center pointer-events-none text-gray-400 p-10 text-center">
+        <span class="text-6xl mb-2">🍽️</span>
+        <p class="text-xl font-bold">아래 재료를 마우스로 드래그하여</p>
+        <p class="text-lg">여기에 순서대로 쌓아 햄버거를 완성해요!</p>
+      </div>
+
+      <!-- 내가 만드는 햄버거 요소들이 실제로 렌더링될 곳 (상단이 위, 하단이 아래) -->
+      <div id="burger-plate" class="flex flex-col-reverse justify-end items-center w-full h-full pt-12 pb-8 gap-1 min-h-[220px]">
+        <!-- 동적으로 플레이트의 재료가 쌓임 -->
+      </div>
+
+      <!-- 플레이트 조작 버튼들 -->
+      <div class="w-full flex justify-between items-center mt-2 z-10">
+        <button onclick="clearPlate()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold px-4 py-2 rounded-xl text-lg transition shadow-md border-2 border-gray-300">
+          🗑️ 전부 비우기
+        </button>
+        <button onclick="popPlate()" class="bg-orange-100 hover:bg-orange-200 text-orange-700 font-bold px-4 py-2 rounded-xl text-lg transition shadow-md border-2 border-orange-300">
+          ↩️ 마지막 한 개 빼기
+        </button>
+        <button onclick="checkBurger()" class="bg-green-500 hover:bg-green-600 text-white font-bold px-6 py-2 rounded-xl text-xl transition shadow-md transform hover:scale-105 active:scale-95 border-b-4 border-green-700">
+          🔔 완성! 검사하기
+        </button>
+      </div>
+    </div>
+
+    <!-- 오른쪽: 미션 버거 및 가이드 -->
+    <div class="md:col-span-5 flex flex-col gap-4">
+      
+      <!-- 미션 정보 카드 -->
+      <div class="bg-amber-100 rounded-3xl border-4 border-amber-400 p-5 shadow-lg relative flex-grow flex flex-col justify-between">
+        <div>
+          <div class="flex justify-between items-center mb-2">
+            <span class="bg-amber-600 text-white font-bold px-3 py-1 rounded-full text-lg shadow-sm" id="mission-badge">
+              미션 1 / 3
+            </span>
+            <span class="text-amber-800 text-lg font-bold" id="mission-difficulty">난이도: 쉬움</span>
+          </div>
+          <h2 class="text-2xl font-bold text-amber-900 mb-2">똑같이 순서대로 쌓아봐요!</h2>
+          <p class="text-amber-800 text-base mb-4 leading-relaxed">
+            ※ <strong>아래(1번)부터 차례대로(순차적으로)</strong> 쌓아 올려야 진짜 맛있는 햄버거가 완성돼요!
+          </p>
+        </div>
+
+        <!-- 미션 햄버거 프리뷰 (목표 가이드) -->
+        <div class="bg-white rounded-2xl p-4 border-2 border-amber-300 flex flex-col-reverse items-center justify-center gap-1 min-h-[160px] shadow-inner" id="mission-preview">
+          <!-- 여기에 미션 버거가 생성됨 (역순 렌더링) -->
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- 하단: 햄버거 재료 선택 영역 (드래그앤드롭 및 클릭 지원) -->
+  <footer class="w-full max-w-4xl bg-orange-100 rounded-3xl border-4 border-orange-300 p-5 shadow-lg">
+    <h3 class="text-xl font-bold text-orange-900 mb-3 text-center">👇 햄버거 재료를 드래그해서 접시에 놓거나, 클릭(터치)해서 쌓으세요!</h3>
+    <div class="grid grid-cols-4 sm:grid-cols-8 gap-3" id="ingredients-container">
+      <!-- 재료 버튼들이 동적으로 생성됨 -->
+    </div>
+  </footer>
+
+  <!-- 미션 클리어 모달 (스텝 성공시) -->
+  <div id="step-success-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-center items-center hidden p-4">
+    <div class="bg-white rounded-3xl border-8 border-green-400 p-8 max-w-md w-full text-center shadow-2xl transform scale-95 transition-transform duration-300">
+      <span class="text-7xl bounce-element block mb-4">🎉</span>
+      <h2 class="title-font text-4xl text-green-600 mb-2" id="modal-step-title">미션 성공!</h2>
+      <p class="text-xl text-gray-700 font-bold mb-6" id="modal-step-desc">우와! 완벽한 알고리즘으로 만드셨네요!</p>
+      
+      <div class="bg-green-50 rounded-2xl p-4 mb-6 border-2 border-green-200 text-left space-y-2">
+        <p class="text-lg text-gray-700">⏱️ 걸린 시간: <span id="modal-step-time" class="font-bold text-green-600">0초</span></p>
+        <p class="text-lg text-gray-700">⭐ 획득 점수: <span id="modal-step-score" class="font-bold text-green-600">+0점</span></p>
+      </div>
+
+      <button onclick="nextMission()" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold text-2xl py-3 px-6 rounded-2xl shadow-lg transition transform active:scale-95 border-b-4 border-green-700">
+        다음 미션 도전하기 ➔
+      </button>
+    </div>
+  </div>
+
+  <!-- 전체 게임 종료 모달 -->
+  <div id="game-over-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex justify-center items-center hidden p-4">
+    <div class="bg-white rounded-3xl border-8 border-amber-400 p-8 max-w-lg w-full text-center shadow-2xl relative">
+      <span class="text-8xl bounce-element block mb-4">🏆</span>
+      <h2 class="title-font text-5xl text-amber-600 mb-2">참 잘했어요!</h2>
+      <p class="text-2xl text-gray-800 font-bold mb-6">스택버거 마스터 등극!</p>
+      
+      <!-- 최종 성적표 -->
+      <div class="bg-amber-50 rounded-2xl p-5 mb-6 border-2 border-amber-200 text-left space-y-3">
+        <h3 class="text-xl font-bold text-amber-800 border-b border-amber-200 pb-2">🎯 오늘의 요리 보고서</h3>
+        <p class="text-lg text-gray-700">정답을 맞춘 미션: <span class="font-bold text-amber-600" id="final-completed-missions">3 / 3개</span></p>
+        <p class="text-lg text-gray-700">총 소요 시간: <span class="font-bold text-amber-600" id="final-total-time">0분 0초</span></p>
+        <p class="text-lg text-gray-700">최종 스코어: <span class="font-bold text-red-500 text-2xl" id="final-total-score">0점</span></p>
+      </div>
+
+      <div class="bg-blue-50 rounded-xl p-4 mb-6 border border-blue-200 text-sm text-blue-800 text-left">
+        💡 <strong>선생님의 한마디:</strong> 순차 알고리즘은 순서가 정말 중요해요! 맨 밑 빵부터 차례대로 쌓아야 햄버거가 무너지지 않듯이, 코딩도 순서대로 생각하는 연습을 해보았답니다. 3차시 보드게임도 신나게 해봐요!
+      </div>
+
+      <button onclick="restartGame()" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold text-2xl py-4 px-6 rounded-2xl shadow-lg transition transform active:scale-95 border-b-4 border-amber-700">
+        다시 도전하기 🔄
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // --- 1. 재료 데이터 정의 ---
+    const INGREDIENTS = {
+      bun_bottom: { id: 'bun_bottom', name: '아래 빵', emoji: '🍞', color: 'bg-amber-200 border-amber-400 text-amber-800' },
+      patty:      { id: 'patty',      name: '고기 패티', emoji: '🍖', color: 'bg-amber-800 border-amber-950 text-white' },
+      cheese:     { id: 'cheese',     name: '치즈', emoji: '🧀', color: 'bg-yellow-300 border-yellow-500 text-yellow-900' },
+      lettuce:    { id: 'lettuce',    name: '양상추', emoji: '🥬', color: 'bg-green-400 border-green-600 text-green-950' },
+      tomato:     { id: 'tomato',     name: '토마토', emoji: '🍅', color: 'bg-red-500 border-red-700 text-white' },
+      onion:      { id: 'onion',      name: '양파', emoji: '🧅', color: 'bg-pink-100 border-pink-300 text-pink-900' },
+      pickle:     { id: 'pickle',     name: '피클', emoji: '🥒', color: 'bg-green-600 border-green-800 text-white' },
+      bun_top:    { id: 'bun_top',    name: '위 빵', emoji: '🍔', color: 'bg-amber-300 border-amber-500 text-amber-900' }
+    };
+
+    // --- 2. 단계별 미션 버거 레시피 (밑에서부터 쌓는 순서) ---
+    const MISSIONS = [
+      {
+        id: 1,
+        difficulty: '쉬움 ⭐',
+        recipe: ['bun_bottom', 'patty', 'lettuce', 'bun_top'],
+        points: 100 // 기본 점수
+      },
+      {
+        id: 2,
+        difficulty: '보통 ⭐⭐',
+        recipe: ['bun_bottom', 'patty', 'cheese', 'tomato', 'lettuce', 'bun_top'],
+        points: 200
+      },
+      {
+        id: 3,
+        difficulty: '어려움 ⭐⭐⭐',
+        recipe: ['bun_bottom', 'patty', 'cheese', 'pickle', 'onion', 'tomato', 'lettuce', 'bun_top'],
+        points: 300
+      }
+    ];
+
+    // --- 3. 게임 상태 변수 ---
+    let currentMissionIndex = 0;
+    let score = 0;
+    let timeLimit = 5 * 60; // 5분 = 300초
+    let timerInterval = null;
+    let missionStartTime = 0;
+    let totalSpentTime = 0;
+
+    // 플레이어가 플레이트에 쌓은 재료 목록 (아래에서부터 위 순서)
+    let myPlate = [];
+
+    // --- 4. 드래그 앤 드롭 구현을 위한 임시 저장 ---
+    let draggedIngredientId = null;
+
+    // --- 5. 초기화 함수 ---
+    window.onload = function() {
+      initGame();
+    }
+
+    function initGame() {
+      currentMissionIndex = 0;
+      score = 0;
+      timeLimit = 5 * 60;
+      totalSpentTime = 0;
+      myPlate = [];
+      
+      updateScoreDisplay();
+      renderIngredientsMenu();
+      loadMission(currentMissionIndex);
+      
+      // 타이머 시작
+      if (timerInterval) clearInterval(timerInterval);
+      timerInterval = setInterval(updateTimer, 1000);
+      updateTimerDisplay();
+      
+      // 미션 시작 시간 기록
+      missionStartTime = Date.now();
+    }
+
+    // --- 6. 하단 재료 메뉴판 렌더링 (드래그 지원 및 터치 지원) ---
+    function renderIngredientsMenu() {
+      const container = document.getElementById('ingredients-container');
+      container.innerHTML = '';
+
+      Object.keys(INGREDIENTS).forEach(key => {
+        const item = INGREDIENTS[key];
+        
+        // 버튼 생성
+        const btn = document.createElement('div');
+        btn.className = `ingredient-btn cursor-grab active:cursor-grabbing border-b-4 flex flex-col items-center justify-center p-3 rounded-2xl shadow-md text-center transform active:scale-95 ${item.color}`;
+        btn.setAttribute('draggable', 'true');
+        btn.setAttribute('data-id', item.id);
+        
+        // 마우스 드래그 이벤트 등록
+        btn.addEventListener('dragstart', function(e) {
+          draggedIngredientId = item.id;
+          e.dataTransfer.setData('text/plain', item.id);
+        });
+
+        // 클릭/터치 이벤트 등록
+        btn.addEventListener('click', function() {
+          addIngredientToPlate(item.id);
+        });
+
+        btn.innerHTML = `
+          <span class="text-3xl mb-1">${item.emoji}</span>
+          <span class="text-sm font-bold tracking-tight">${item.name}</span>
+        `;
+
+        container.appendChild(btn);
+      });
+
+      // 플레이트 영역에 드롭 이벤트 바인딩
+      const plateArea = document.getElementById('burger-plate').parentElement;
+      
+      plateArea.addEventListener('dragover', function(e) {
+        e.preventDefault(); // 드롭 허용
+      });
+
+      plateArea.addEventListener('drop', function(e) {
+        e.preventDefault();
+        const id = e.dataTransfer.getData('text/plain') || draggedIngredientId;
+        if (id && INGREDIENTS[id]) {
+          addIngredientToPlate(id);
+        }
+        draggedIngredientId = null;
+      });
+    }
+
+    // --- 7. 미션 불러오기 ---
+    function loadMission(index) {
+      if (index >= MISSIONS.length) {
+        endGame(true);
+        return;
+      }
+
+      const mission = MISSIONS[index];
+      
+      // UI 업데이트
+      document.getElementById('mission-badge').textContent = `미션 ${mission.id} / ${MISSIONS.length}`;
+      document.getElementById('mission-difficulty').textContent = `난이도: ${mission.difficulty}`;
+      
+      // 미션 햄버거 미리보기 렌더링
+      const previewArea = document.getElementById('mission-preview');
+      previewArea.innerHTML = '';
+
+      // 미션 버거는 역순으로 렌더링해서 맨밑 빵이 아래로 오게 정렬
+      mission.recipe.forEach((ingId, idx) => {
+        const item = INGREDIENTS[ingId];
+        const numLabel = idx + 1; // 순차 번호 (1번부터 쌓기 유도)
+        
+        const layer = document.createElement('div');
+        layer.className = `w-11/12 max-w-[280px] h-9 rounded-xl border-2 flex items-center justify-between px-4 font-bold text-base shadow-sm ${item.color}`;
+        layer.innerHTML = `
+          <div class="flex items-center gap-1">
+            <span class="bg-white/80 text-gray-800 rounded-full w-5 h-5 flex items-center justify-center text-xs border border-gray-400">${numLabel}</span>
+            <span>${item.emoji} ${item.name}</span>
+          </div>
+          <span class="text-xs opacity-75">${numLabel === 1 ? '처음' : numLabel === mission.recipe.length ? '마지막' : '순서대로'}</span>
+        `;
+        previewArea.appendChild(layer);
+      });
+
+      // 내 접시 리셋
+      clearPlate();
+      
+      // 개별 미션 타이머 리셋
+      missionStartTime = Date.now();
+    }
+
+    // --- 8. 내 플레이트에 재료 추가하기 ---
+    function addIngredientToPlate(id) {
+      if (myPlate.length >= 10) {
+        alertToast("⚠️ 접시에 자리가 없어요! 10개 이상 쌓을 수 없습니다.");
+        return;
+      }
+
+      myPlate.push(id);
+      renderPlate();
+      
+      // 가이드 플레이스홀더 숨기기
+      document.getElementById('plate-placeholder').style.opacity = myPlate.length > 0 ? '0' : '1';
+      
+      // 터치 음향 대용으로 간단한 햅틱/클릭 피드백
+      createParticles();
+    }
+
+    // --- 9. 내 플레이트 화면 렌더링 ---
+    function renderPlate() {
+      const plate = document.getElementById('burger-plate');
+      plate.innerHTML = '';
+
+      myPlate.forEach((ingId, idx) => {
+        const item = INGREDIENTS[ingId];
+        const numLabel = idx + 1;
+
+        const layer = document.createElement('div');
+        layer.className = `w-11/12 max-w-[320px] h-11 rounded-2xl border-4 flex items-center justify-between px-5 font-bold text-lg shadow-md transform hover:scale-102 transition ${item.color} animate-[bounce_0.2s_ease-out]`;
+        layer.innerHTML = `
+          <div class="flex items-center gap-2">
+            <span class="bg-white text-gray-800 rounded-full w-6 h-6 flex items-center justify-center text-xs border-2 border-gray-400">${numLabel}</span>
+            <span>${item.emoji} ${item.name}</span>
+          </div>
+          <button onclick="removeIngredient(${idx}); event.stopPropagation();" class="text-sm bg-black/10 hover:bg-black/20 text-current rounded-full w-6 h-6 flex items-center justify-center">✕</button>
+        `;
+        plate.appendChild(layer);
+      });
+
+      // 가이드 메시지 표시/비표시 처리
+      document.getElementById('plate-placeholder').style.opacity = myPlate.length > 0 ? '0' : '1';
+    }
+
+    // --- 10. 특정 레이어 삭제 ---
+    function removeIngredient(index) {
+      myPlate.splice(index, 1);
+      renderPlate();
+    }
+
+    // --- 11. 전부 비우기 및 하나 빼기 ---
+    function clearPlate() {
+      myPlate = [];
+      renderPlate();
+    }
+
+    function popPlate() {
+      myPlate.pop();
+      renderPlate();
+    }
+
+    // --- 12. 햄버거 검사하기 (알고리즘 검증) ---
+    function checkBurger() {
+      const currentMission = MISSIONS[currentMissionIndex];
+      const targetRecipe = currentMission.recipe;
+
+      // 1. 재료 개수 비교
+      if (myPlate.length === 0) {
+        alertToast("🍔 아직 아무 재료도 쌓지 않았어요!");
+        return;
+      }
+
+      if (myPlate.length !== targetRecipe.length) {
+        alertToast("❌ 레시피의 재료 수량과 맞지 않아요! 다시 순차를 확인해보세요.");
+        return;
+      }
+
+      // 2. 순차적으로 알맞게 들어갔는지 검사
+      let isPerfect = true;
+      for (let i = 0; i < targetRecipe.length; i++) {
+        if (myPlate[i] !== targetRecipe[i]) {
+          isPerfect = false;
+          break;
+        }
+      }
+
+      if (isPerfect) {
+        // 미션 성공 처리!
+        triggerSuccess();
+      } else {
+        alertToast("❌ 아이쿠! 재료의 순서가 틀렸어요. 위쪽 가이드의 번호(순서)를 천천히 확인해보세요!");
+      }
+    }
+
+    // --- 13. 미션 성공 트리거 ---
+    function triggerSuccess() {
+      const currentMission = MISSIONS[currentMissionIndex];
+      
+      // 걸린 시간 계산 (초)
+      const elapsed = Math.round((Date.now() - missionStartTime) / 1000);
+      totalSpentTime += elapsed;
+
+      // 점수 계산 공식: 기본점수 + (30초 미만 성공 시 남은 시간 보너스 점수)
+      const timeBonus = Math.max(0, (60 - elapsed) * 2);
+      const earnedPoints = currentMission.points + timeBonus;
+      score += earnedPoints;
+
+      updateScoreDisplay();
+
+      // 모달 표시
+      document.getElementById('modal-step-title').textContent = `${currentMission.id}단계 통과! 🎉`;
+      document.getElementById('modal-step-time').textContent = `${elapsed}초`;
+      document.getElementById('modal-step-score').textContent = `+${earnedPoints}점`;
+      
+      document.getElementById('step-success-modal').classList.remove('hidden');
+    }
+
+    // --- 14. 다음 단계로 ---
+    function nextMission() {
+      document.getElementById('step-success-modal').classList.add('hidden');
+      currentMissionIndex++;
+      
+      if (currentMissionIndex < MISSIONS.length) {
+        loadMission(currentMissionIndex);
+      } else {
+        // 모든 미션을 끝내고 승리
+        endGame(true);
+      }
+    }
+
+    // --- 15. 타이머 및 점수 갱신 ---
+    function updateTimer() {
+      if (timeLimit > 0) {
+        timeLimit--;
+        updateTimerDisplay();
+      } else {
+        clearInterval(timerInterval);
+        endGame(false); // 시간 초과로 게임 끝
+      }
+    }
+
+    function updateTimerDisplay() {
+      const minutes = Math.floor(timeLimit / 60);
+      const seconds = timeLimit % 60;
+      document.getElementById('timer-display').textContent = 
+        `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+
+    function updateScoreDisplay() {
+      document.getElementById('score-display').textContent = score;
+    }
+
+    // --- 16. 게임 종료 처리 (성공 또는 시간초과) ---
+    function endGame(isSuccess) {
+      clearInterval(timerInterval);
+      
+      const totalMinutes = Math.floor(totalSpentTime / 60);
+      const totalSeconds = totalSpentTime % 60;
+
+      // 최종 모달 셋팅
+      document.getElementById('final-completed-missions').textContent = `${currentMissionIndex} / ${MISSIONS.length}개`;
+      document.getElementById('final-total-time').textContent = `${totalMinutes}분 ${totalSeconds}초`;
+      document.getElementById('final-total-score').textContent = `${score}점`;
+
+      document.getElementById('game-over-modal').classList.remove('hidden');
+    }
+
+    // 다시 시작
+    function restartGame() {
+      document.getElementById('game-over-modal').classList.add('hidden');
+      initGame();
+    }
+
+    // --- 17. 아이들을 위한 부가 비주얼 효과들 ---
+    
+    // 알림 메시지 토스트창 구현 (alert 대신 사용)
+    function alertToast(message) {
+      // 기존에 뜬 알람이 있으면 제거
+      const existing = document.querySelector('.custom-toast');
+      if (existing) existing.remove();
+
+      const toast = document.createElement('div');
+      toast.className = 'custom-toast fixed top-10 left-1/2 transform -translate-x-1/2 bg-red-500 text-white font-bold text-xl px-6 py-4 rounded-2xl shadow-2xl z-50 animate-bounce border-4 border-red-300 text-center max-w-sm';
+      toast.innerHTML = message;
+      document.body.appendChild(toast);
+
+      setTimeout(() => {
+        toast.style.transition = 'opacity 0.5s';
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 500);
+      }, 2500);
+    }
+
+    // 재료 올릴 때 팡 터지는 파티클 효과
+    function createParticles() {
+      const activeArea = document.getElementById('burger-plate');
+      for (let i = 0; i < 10; i++) {
+        const p = document.createElement('div');
+        p.className = 'particle text-2xl';
+        p.textContent = ['✨', '⭐', '🎈', '❤️', '🍔'][Math.floor(Math.random() * 5)];
+        p.style.left = `${Math.random() * 80 + 10}%`;
+        p.style.bottom = `${Math.random() * 40 + 20}px`;
+        p.style.fontSize = `${Math.random() * 20 + 15}px`;
+        p.style.animationDelay = `${Math.random() * 0.2}s`;
+        
+        activeArea.appendChild(p);
+        setTimeout(() => p.remove(), 1500);
+      }
+    }
+  </script>
+</body>
+</html>
